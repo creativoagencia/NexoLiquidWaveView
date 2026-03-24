@@ -18,12 +18,12 @@ class NexoLiquidWaveView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     private val wavePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(90, 255, 255, 255)
+        color = Color.argb(140, 255, 255, 255)
         style = Paint.Style.FILL
     }
 
     private val bubblePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(110, 255, 255, 255)
+        color = Color.argb(180, 255, 255, 255)
         style = Paint.Style.FILL
     }
 
@@ -32,8 +32,6 @@ class NexoLiquidWaveView @JvmOverloads constructor(
     private var isAnimating = false
     private var waveLevel = 0f
     private var targetWaveLevel = 0f
-
-    // Tiempo general de animación
     private var time = 0f
 
     private data class Bubble(
@@ -46,7 +44,7 @@ class NexoLiquidWaveView @JvmOverloads constructor(
     )
 
     private val bubbles = mutableListOf<Bubble>()
-    private val maxBubbles = 18
+    private val maxBubbles = 30 // más burbujas para efecto más líquido
 
     fun startAnimation() {
         if (isAnimating) return
@@ -69,11 +67,8 @@ class NexoLiquidWaveView @JvmOverloads constructor(
             waveLevel = targetWaveLevel
         }
 
-        if (wasZero && newLevel > 0.01f) {
-            invalidate()
-        } else {
-            invalidate()
-        }
+        invalidate()
+        if (wasZero && newLevel > 0.01f) postInvalidateOnAnimation()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -88,25 +83,17 @@ class NexoLiquidWaveView @JvmOverloads constructor(
         if (waveLevel <= 0.01f && targetWaveLevel <= 0.01f) {
             waveLevel = 0f
             bubbles.clear()
-
-            if (isAnimating) {
-                postInvalidateOnAnimation()
-            }
+            if (isAnimating) postInvalidateOnAnimation()
             return
         }
 
         val centerY = h * 0.80f
         val compressedLevel = 1f - (1f - waveLevel) * (1f - waveLevel)
 
-        // altura principal de la ola
-        val amplitudeMain = h * (0.008f + compressedLevel * 0.10f)
-
-        // detalle local para romper uniformidad
-        val amplitudeDetail = h * (0.003f + compressedLevel * 0.028f)
-
-        // olas bastante juntas
-        val waveLengthMain = w / 2.5f
-        val waveLengthDetail = w / 1.15f
+        val amplitudeMain = h * (0.008f + compressedLevel * 0.12f)
+        val amplitudeDetail = h * (0.003f + compressedLevel * 0.03f)
+        val waveLengthMain = w / 3.0f   // olas más juntas
+        val waveLengthDetail = w / 1.1f
 
         wavePath.reset()
         wavePath.moveTo(0f, h)
@@ -114,39 +101,25 @@ class NexoLiquidWaveView @JvmOverloads constructor(
         var x = 0f
         while (x <= w) {
             val nx = x / w
-
-            // Forma base
             val base = sin(((x / waveLengthMain) * 2f * PI).toFloat())
 
-            // Modulación local: cada zona "respira" distinto
             val localMotion1 = sin((time * 1.7f) + nx * 8f)
             val localMotion2 = sin((time * 2.3f) + nx * 15f)
             val localMotion3 = sin((time * 1.1f) - nx * 12f)
-
-            // Envolvente para que unos picos crezcan más que otros
-            val localEnvelope =
-                0.65f +
-                        0.20f * localMotion1 +
-                        0.10f * localMotion2 +
-                        0.05f * localMotion3
+            val localEnvelope = 0.65f + 0.20f * localMotion1 + 0.10f * localMotion2 + 0.05f * localMotion3
 
             val detail = sin(
                 ((x / waveLengthDetail) * 2f * PI).toFloat() +
-                        localMotion1 * 0.6f +
-                        localMotion2 * 0.35f
+                        localMotion1 * 0.6f + localMotion2 * 0.35f
             )
 
-            val y = centerY +
-                    (amplitudeMain * localEnvelope) * base +
-                    amplitudeDetail * detail
-
+            val y = centerY + (amplitudeMain * localEnvelope) * base + amplitudeDetail * detail
             wavePath.lineTo(x, y)
-            x += 5f
+            x += 3f  // pasos más pequeños = olas más suaves y juntas
         }
 
         wavePath.lineTo(w, h)
         wavePath.close()
-
         canvas.drawPath(wavePath, wavePaint)
 
         updateAndDrawBubbles(
@@ -174,8 +147,8 @@ class NexoLiquidWaveView @JvmOverloads constructor(
         waveLengthMain: Float,
         waveLengthDetail: Float
     ) {
-        if (waveLevel > 0.03f && bubbles.size < maxBubbles) {
-            val chance = 0.20f + (waveLevel * 0.30f)
+        if (waveLevel > 0.02f && bubbles.size < maxBubbles) {
+            val chance = 0.35f + (waveLevel * 0.45f)
             if (Random.nextFloat() < chance) {
                 val bubbleX = Random.nextFloat() * w
                 bubbles.add(
@@ -188,11 +161,11 @@ class NexoLiquidWaveView @JvmOverloads constructor(
                             amplitudeDetail = amplitudeDetail,
                             waveLengthMain = waveLengthMain,
                             waveLengthDetail = waveLengthDetail
-                        ) - Random.nextFloat() * 16f,
-                        radius = 2f + Random.nextFloat() * (3f + waveLevel * 4f),
-                        speed = 1f + Random.nextFloat() * (1.2f + waveLevel * 1.6f),
-                        alpha = 70 + Random.nextInt(90),
-                        drift = -0.4f + Random.nextFloat() * 0.8f
+                        ) - Random.nextFloat() * 18f,
+                        radius = 3f + Random.nextFloat() * (5f + waveLevel * 5f),
+                        speed = 1f + Random.nextFloat() * (2f + waveLevel * 2f),
+                        alpha = 100 + Random.nextInt(100),
+                        drift = -0.5f + Random.nextFloat() * 1f
                     )
                 )
             }
@@ -201,7 +174,6 @@ class NexoLiquidWaveView @JvmOverloads constructor(
         val iterator = bubbles.iterator()
         while (iterator.hasNext()) {
             val bubble = iterator.next()
-
             bubble.y -= bubble.speed
             bubble.x += bubble.drift
 
@@ -224,27 +196,15 @@ class NexoLiquidWaveView @JvmOverloads constructor(
         waveLengthDetail: Float
     ): Float {
         val nx = x / width.toFloat().coerceAtLeast(1f)
-
         val base = sin(((x / waveLengthMain) * 2f * PI).toFloat())
-
         val localMotion1 = sin((time * 1.7f) + nx * 8f)
         val localMotion2 = sin((time * 2.3f) + nx * 15f)
         val localMotion3 = sin((time * 1.1f) - nx * 12f)
-
-        val localEnvelope =
-            0.65f +
-                    0.20f * localMotion1 +
-                    0.10f * localMotion2 +
-                    0.05f * localMotion3
-
+        val localEnvelope = 0.65f + 0.20f * localMotion1 + 0.10f * localMotion2 + 0.05f * localMotion3
         val detail = sin(
             ((x / waveLengthDetail) * 2f * PI).toFloat() +
-                    localMotion1 * 0.6f +
-                    localMotion2 * 0.35f
+                    localMotion1 * 0.6f + localMotion2 * 0.35f
         )
-
-        return centerY +
-                (amplitudeMain * localEnvelope) * base +
-                amplitudeDetail * detail
+        return centerY + (amplitudeMain * localEnvelope) * base + amplitudeDetail * detail
     }
 }
